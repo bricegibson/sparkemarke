@@ -1,3 +1,5 @@
-public/*
-old/*
-node_modules/*
+public/
+old/
+node_modules/
+.env
+.DS_Store
