@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Results - <%= student.name %></title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .chart-container {
+      width: 90%;
+      height: 450px; /* Chart height */
+      margin-bottom: 30px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 90%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body class="container mt-5">
+  <h2>Results for <%= student.name %> (ID: <%= studentId %>)</h2>
+
+  <!-- Chart -->
+  <div class="chart-container">
+    <canvas id="allSubjectsChart"></canvas>
+  </div>
+
+  <script>
+    const formattedSubjects = <%- JSON.stringify(formattedSubjects) %>;
+
+    // Collect all unique dates
+    let allDates = [];
+    for (let subject in formattedSubjects) {
+      formattedSubjects[subject].forEach(s => {
+        if (!allDates.includes(s.formattedDate)) allDates.push(s.formattedDate);
+      });
+    }
+
+    // Sort dates
+    allDates.sort((a,b) => {
+      const months = {Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11};
+      const [d1, m1] = a.split('-'); 
+      const [d2, m2] = b.split('-'); 
+      return new Date(2000, months[m1], parseInt(d1)) - new Date(2000, months[m2], parseInt(d2));
+    });
+
+    // Prepare datasets for chart
+    const colors = ['blue','red','green','orange','purple','brown','pink','cyan'];
+    let colorIndex = 0;
+    const datasets = Object.keys(formattedSubjects).map(subject => {
+      const data = allDates.map(date => {
+        const found = formattedSubjects[subject].find(s => s.formattedDate === date);
+        return found ? found.score : null;
+      });
+      const dataset = {
+        label: subject,
+        data,
+        borderColor: colors[colorIndex % colors.length],
+        fill: false,
+        tension: 0.2,
+        spanGaps: true
+      };
+      colorIndex++;
+      return dataset;
+    });
+
+    // Render chart
+    const ctx = document.getElementById('allSubjectsChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: { labels: allDates, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: 'bottom' } },
+        scales: { y: { beginAtZero: true }, x: { ticks: { maxRotation: 45, minRotation: 0 } } }
+      }
+    });
+  </script>
+
+  <!-- Table grouped by date -->
+  <h3>Scores Table</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <% Object.keys(formattedSubjects).forEach(subject => { %>
+          <th><%= subject %></th>
+        <% }) %>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% allDates.forEach(date => { %>
+        <tr>
+          <td><%= date %></td>
+          <% Object.keys(formattedSubjects).forEach(subject => {
+              const found = formattedSubjects[subject].find(s => s.formattedDate === date);
+          %>
+            <td><%= found ? found.score : '-' %></td>
+          <% }) %>
+        </tr>
+      <% }) %>
+    </tbody>
+
+  </table>
+</body>
+</html>

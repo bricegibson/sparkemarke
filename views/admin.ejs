@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    .admin-container {
+      width: 95%;
+      margin: 0 auto; /* center horizontally */
+    }
+  </style>
+</head>
+<body class="mt-4">
+
+  <div class="admin-container">
+
+    <!-- Header -->
+    <header class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Admin Panel</h2>
+      <div>
+        Logged in as: <strong><%= adminUser %></strong>
+        <a href="/admin-logout" class="btn btn-outline-secondary btn-sm ms-2">Logout</a>
+      </div>
+    </header>
+
+    <!-- 3 Column Layout with Cards -->
+    <div class="row g-4">
+      
+      <!-- Column 1: Schools -->
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h3 class="card-title">Schools</h3>
+            <form action="/admin/schools" method="POST" class="mb-3">
+              <div class="mb-2">
+                <label>School ID</label>
+                <input type="text" name="id" required class="form-control">
+              </div>
+              <div class="mb-2">
+                <label>School Name</label>
+                <input type="text" name="name" required class="form-control">
+              </div>
+              <button type="submit" class="btn btn-success btn-sm">Add School</button>
+            </form>
+
+            <h5>Existing Schools</h5>
+            <ul class="list-group">
+              <% if (schools.length === 0) { %>
+                <li class="list-group-item">No schools yet.</li>
+              <% } else { %>
+                <% schools.forEach(s => { %>
+                  <li class="list-group-item"><%= s.schoolName %> (ID: <%= s.schoolID %>)</li>
+                <% }) %>
+              <% } %>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Teachers -->
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h3 class="card-title">Teachers</h3>
+            <form action="/admin/teachers" method="POST" class="mb-3">
+              <div class="mb-2">
+                <label>Teacher ID</label>
+                <input type="text" name="id" required class="form-control">
+              </div>
+              <div class="mb-2">
+                <label>Teacher Name</label>
+                <input type="text" name="name" required class="form-control">
+              </div>
+              <div class="mb-2">
+                <label>School</label>
+                <select name="schoolId" required class="form-control">
+                  <option value="" disabled selected>Select a school</option>
+                  <% schools.forEach(s => { %>
+                    <option value="<%= s.schoolID %>"><%= s.schoolName %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label>Password</label>
+                <input type="password" name="password" required class="form-control">
+              </div>
+              <button type="submit" class="btn btn-success btn-sm">Add Teacher</button>
+            </form>
+
+            <h5>Existing Teachers</h5>
+            <ul class="list-group">
+              <% if (teachers.length === 0) { %>
+                <li class="list-group-item">No teachers yet.</li>
+              <% } else { %>
+                <% teachers.forEach(t => { %>
+                  <li class="list-group-item">
+                    <%= t.teacherName %> (ID: <%= t.teacherID %>) - <em><%= t.schoolName || "No school" %></em>
+                  </li>
+                <% }) %>
+              <% } %>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Subjects -->
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h3 class="card-title">Subjects</h3>
+            <form action="/admin/subjects" method="POST" class="mb-3">
+              <div class="mb-2">
+                <label>Subject Name</label>
+                <input type="text" name="name" required class="form-control">
+              </div>
+              <div class="mb-2">
+                <label>Teacher</label>
+                <select name="teacherId" required class="form-control">
+                  <option value="" disabled selected>Select a teacher</option>
+                  <% teachers.forEach(t => { %>
+                    <option value="<%= t.teacherID %>"><%= t.teacherName %> - <%= t.schoolName %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-success btn-sm">Add Subject</button>
+            </form>
+
+            <h5>Existing Subjects</h5>
+            <ul class="list-group">
+              <% if (subjects.length === 0) { %>
+                <li class="list-group-item">No subjects yet.</li>
+              <% } else { %>
+                <% subjects.forEach(subj => { %>
+                  <li class="list-group-item">
+                    <%= subj.subjectName%> - <%= subj.teacherName %> (<%= subj.schoolName %>)
+                  </li>
+                <% }) %>
+              <% } %>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
