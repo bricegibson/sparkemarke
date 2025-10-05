@@ -1,12 +1,12 @@
-// database.js
-const sqlite3 = require("sqlite3").verbose();
+const Database = require("better-sqlite3");
 
-const db = new sqlite3.Database("./students.db", (err) => {
-  if (err) {
-    console.error("❌ Error connecting to SQLite database:", err.message);
-  } else {
-    console.log("✅ Connected to SQLite database.");
-  }
-});
+// Open or create the database file synchronously
+const db = new Database("./students.db");
+
+// Log a confirmation message once opened
+console.log("✅ Connected to SQLite database (better-sqlite3).");
+
+// Optional: enforce foreign keys if you use them
+db.pragma("foreign_keys = ON");
 
 module.exports = db;

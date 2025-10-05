@@ -1,7 +1,7 @@
 {
-  "name": "mclass",
+  "name": "ClassToria",
   "version": "1.0.0",
-  "description": "Marilyn's Class Project",
+  "description": "class grade tracker",
   "license": "ISC",
   "author": "",
   "type": "commonjs",
@@ -10,12 +10,11 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "@sgratzl/chartjs-chart-boxplot": "^4.4.4",
     "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.4.1",
     "body-parser": "^1.20.3",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
-    "express-session": "^1.18.2",
-    "sqlite3": "^5.1.7"
+    "express-session": "^1.18.2"
   }
 }
