@@ -7,8 +7,8 @@ const db = new Database("/var/data/students.db");
 console.log("✅ Connected to SQLite database (better-sqlite3).");
 
 
-  db.run(`
+  db.prepare(`
     DELETE FROM scores
-  `);
+  `).run();
 
 module.exports = db;
