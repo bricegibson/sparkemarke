@@ -419,9 +419,18 @@ app.post("/submit-score", (req, res) => {
   let scoreActual = null;
 
   if (percentScore && !pointsEarned && !pointsPossible) {
-    scoreValue = parseFloat(percentScore);
-    scoreActual = scoreValue / 100.0;
+    let raw = parseFloat(percentScore);
+
+    // if user entered fraction (like .47), convert to percent
+    if (raw > 0 && raw <= 1) {
+      raw = raw * 100;
+    }
+
+    // normalize to two decimal places
+    scoreValue = parseFloat(raw.toFixed(2));
+    scoreActual = parseFloat((scoreValue / 100).toFixed(4));
   }
+
   if (pointsEarned && pointsPossible) {
     const pe = parseFloat(pointsEarned);
     const pp = parseFloat(pointsPossible);

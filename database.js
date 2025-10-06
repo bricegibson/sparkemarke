@@ -1,14 +1,21 @@
+const path = require("path");
 const Database = require("better-sqlite3");
+const fs = require("fs");
 
-// Open or create the database file synchronously
-const db = new Database("/var/data/students.db");
+// Detect environment: Render (Linux) or local (Windows/macOS)
+let dbPath;
 
-// Log a confirmation message once opened
-console.log("✅ Connected to SQLite database (better-sqlite3).");
+// Render persistent disk
+if (fs.existsSync("/var/data")) {
+  dbPath = "/var/data/students.db";
+} else {
+  // Local fallback
+  dbPath = path.join(__dirname, "var/data/students.db");
+}
 
+// Open database
+const db = new Database(dbPath);
 
-  db.prepare(`
-    DELETE FROM scores
-  `).run();
+console.log(`✅ Connected to database at ${dbPath}`);
 
 module.exports = db;

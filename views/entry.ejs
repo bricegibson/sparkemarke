@@ -3,6 +3,12 @@
 <head>
   <title>Score Entry - SparkeMarke</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <style>
+    .container {
+        max-width: 75% !important; /* or try 100% for full width */
+    }
+    </style>  
 </head>
 <body class="container mt-4">
 
@@ -46,14 +52,15 @@
         <div class="card shadow-sm" style="height:500px; overflow:hidden;">
             <div class="card-body d-flex flex-column">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                <h5 class="card-title mb-0"><%= subject.subjectName %></h5>
-                <% if (averages[subject.subjectID]) { %>
-                    <span class="<%= getScoreColor(averages[subject.subjectID]) %> fs-4 fw-bold">
-                    <%= Math.round(averages[subject.subjectID] * 100) %>%
-                    </span>
-                <% } else { %>
-                    <span class="text-muted small">—</span>
-                <% } %>
+                    <h5 class="card-title mb-0"><%= subject.subjectName %></h5>
+                    <% if (averages[subject.subjectID]) { %>
+                        <span class="<%= getScoreColor(averages[subject.subjectID]) %> fs-4 fw-bold">
+                            <%= (averages[subject.subjectID] * 100).toFixed(2) %>%
+                        </span>
+                    <% } else { %>
+                        <span class="text-muted">No scores yet</span>
+                    <% } %>
+
                 </div>
                 
                 
@@ -64,7 +71,7 @@
 
                         <label class="me-2 mb-0 small">Goal:</label>
                         <div class="d-flex align-items-center" style="gap: 2px;">
-                            <input type="number" step="0.01" min="0" max="100" name="studentGoal"
+                            <input type="number" step="0.0001" min="0" max="100" name="studentGoal"
                                 value="<%= subject.goal ? Math.round(subject.goal * 100) : '' %>"
                                 class="form-control form-control-sm text-end"
                                 style="width: 60px; padding-right: 4px;">
@@ -95,6 +102,7 @@
                             checked onclick="toggleInputs('<%= subject.subjectID %>', 'percent')">
                         <label class="form-check-label">Score %</label>
                     </div>
+
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio"
                             name="scoreType_<%= subject.subjectID %>" value="points"
@@ -105,7 +113,7 @@
 
                     <!-- Percent input -->
                     <div id="percent_<%= subject.id %>" class="mb-2">
-                    <input type="number" step="0.1" name="percentScore"
+                        <input type="number" step="0.0001" min="0" max="100" name="percentScore"
                             placeholder="% Score" class="form-control form-control-sm">
                     </div>
 
@@ -132,14 +140,16 @@
                             <% const pct = Math.round((score.scoreActual || 0) * 100); %>
                             
                             <li class="d-flex justify-content-between align-items-center <%= getScoreColor(score.scoreActual) %>">
-                            <div>
-                                <strong><%= score.scoreDate %></strong> –
-                                <% if (score.scorePossible) { %>
-                                    <%= score.scoreValue %> / <%= score.scorePossible %> (<%= pct %>%)
-                                <% } else { %>
-                                    <%= pct %>%
-                                <% } %>
-                            </div>
+                                <div>
+                                    <strong><%= score.scoreDate %></strong> –
+                                    <% if (score.scorePossible) { %>
+                                        <%= Number(score.scoreValue).toFixed(2) %> /
+                                        <%= Number(score.scorePossible).toFixed(2) %>
+                                        (<%= ((score.scoreActual || 0) * 100).toFixed(2) %>%)
+                                    <% } else { %>
+                                        <%= ((score.scoreActual || 0) * 100).toFixed(2) %>%
+                                    <% } %>
+                                </div>
 
                             <% if (loggedInTeacherId) { %>
                                 <form action="/delete-score" method="POST" class="m-0">
