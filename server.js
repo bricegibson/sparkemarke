@@ -53,9 +53,17 @@ function requireAdmin(req, res, next) {
 
 function requireStudentAccess(req, res, next) {
   const { studentId } = req.params;
+
+  // ✅ Allow access if teacher is logged in
+  if (req.session.teacherId) {
+    return next();
+  }
+
+  // Otherwise, require student session
   if (!req.session.studentId || req.session.studentId != studentId) {
     return res.redirect("/");
   }
+
   next();
 }
 
@@ -133,6 +141,11 @@ app.get("/teacher-login", (req, res) => {
 
 app.post("/teacher-login", async (req, res) => {
   const { teacherId, password } = req.body;
+  
+  // clear any student session
+  req.session.studentId = null;
+  req.session.studentTeacherId = null; 
+
   try {
     const teacher = db
       .prepare("SELECT * FROM teachers WHERE teacherID = ?")
@@ -144,6 +157,7 @@ app.post("/teacher-login", async (req, res) => {
 
     req.session.teacherId = teacher.teacherID;
     req.session.teacherName = teacher.teacherName;
+    
     res.redirect(`/teacher/${teacher.teacherID}`);
   } catch (err) {
     console.error(err);
@@ -160,13 +174,12 @@ app.get("/teacher-logout", (req, res) => {
 // ────────────────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   try {
-    const teachers = db
-      .prepare(
-        `SELECT t.teacherID, t.teacherName, s.schoolName AS schoolName
-         FROM teachers t
-         LEFT JOIN schools s ON t.teacherSchoolID = s.schoolID`
-      )
-      .all();
+    const teachers = db.prepare(`
+      SELECT t.teacherID, t.teacherName, s.schoolName AS schoolName
+      FROM teachers t
+      LEFT JOIN schools s ON t.teacherSchoolID = s.schoolID
+    `).all();
+
     res.render("index", { teachers });
   } catch (err) {
     console.error(err);
@@ -174,46 +187,83 @@ app.get("/", (req, res) => {
   }
 });
 
-// AJAX: students for teacher
-app.get("/api/students/:teacherId", (req, res) => {
-  const teacherId = req.params.teacherId;
-  try {
-    const rows = db
-      .prepare(
-        `SELECT studentID, studentName
-         FROM students
-         WHERE studentTeacherID = ?`
-      )
-      .all(teacherId);
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
-  }
-});
+// check if code is valid and not expired
+app.post("/api/check-code", (req, res) => {
+  const { code } = req.body;
 
-app.post("/student-code", (req, res) => {
-  const { code, studentId } = req.body;
   try {
-    const row = db
-      .prepare(
-        `SELECT codeTeacherID, codeText, codeCreatedDate
-         FROM codes
-         WHERE codeText = ?
-         ORDER BY codeCreatedDate DESC
-         LIMIT 1`
-      )
-      .get(code);
+    const row = db.prepare(`
+      SELECT c.codeTeacherID, c.codeText, c.codeCreatedDate, t.teacherName
+      FROM codes c
+      JOIN teachers t ON c.codeTeacherID = t.teacherID
+      WHERE c.codeText = ?
+      ORDER BY c.codeCreatedDate DESC
+      LIMIT 1
+    `).get(code);
 
-    if (!row) return res.status(401).send("Invalid code");
+    if (!row) return res.json({ valid: false, message: "Invalid code" });
 
     const createdAt = new Date(row.codeCreatedDate);
     const now = new Date();
     const diffHours = (now - createdAt) / (1000 * 60 * 60);
+    if (diffHours > 24) return res.json({ valid: false, message: "Code expired" });
+
+    // Get students for that teacher
+    const students = db.prepare(`
+      SELECT studentID, studentName
+      FROM students
+      WHERE studentTeacherID = ?
+      ORDER BY studentName
+    `).all(row.codeTeacherID);
+
+    res.json({
+      valid: true,
+      teacherId: row.codeTeacherID,
+      teacherName: row.teacherName,
+      students
+    });
+  } catch (err) {
+    console.error(err);
+    res.json({ valid: false, message: "Server error" });
+  }
+});
+
+
+// Student login with selected student and teacher
+app.post("/student-login", (req, res) => {
+  const { code, studentId } = req.body;
+  req.session.teacherId = null; 
+
+  try {
+    // 1) Look up code (sync)
+    const row = db.prepare(`
+      SELECT c.codeTeacherID, c.codeText, c.codeCreatedDate
+      FROM codes c
+      WHERE c.codeText = ?
+      ORDER BY c.codeCreatedDate DESC
+      LIMIT 1
+    `).get((code || "").trim().toUpperCase());
+
+    if (!row) return res.status(401).send("Invalid code");
+
+    // 2) Expiry check (24h)
+    const createdAt = new Date(row.codeCreatedDate);
+    const diffHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
     if (diffHours > 24) return res.status(401).send("Code expired");
 
-    // bind student to session and go to entry
+    // 3) (Optional but recommended) ensure student belongs to this teacher
+    const owns = db.prepare(`
+      SELECT 1
+      FROM students
+      WHERE studentID = ? AND studentTeacherID = ?
+    `).get(studentId, row.codeTeacherID);
+    if (!owns) return res.status(403).send("Student not in this class.");
+
+    // 4) Set session and go
+    
     req.session.studentId = studentId;
+    req.session.studentTeacherId = row.codeTeacherID;  // distinct name
+
     res.redirect(`/entry/${studentId}`);
   } catch (err) {
     console.error(err);
@@ -221,11 +271,31 @@ app.post("/student-code", (req, res) => {
   }
 });
 
+
+// STUDENT LOGOUT
+app.get("/student-logout", (req, res) => {
+  // Only clear student info — keep teacherId for context
+  req.session.studentId = null;
+  res.redirect("/");
+});
+
 // ────────────────────────────────────────────────────────────────────────────────
 // ENTRY PAGE
 // ────────────────────────────────────────────────────────────────────────────────
 app.get("/entry/:studentId", requireStudentAccess, (req, res) => {
   const studentId = req.params.studentId;
+  const teacherId = req.session.teacherId || req.session.studentTeacherId;
+
+  // only allow if teacher owns the student
+  if (req.session.teacherId) {
+    const ownsStudent = db.prepare(
+      `SELECT 1 FROM students WHERE studentID = ? AND studentTeacherID = ?`
+    ).get(studentId, teacherId);
+
+    if (!ownsStudent) {
+      return res.status(403).send("Access denied: student not in your class.");
+    }
+  }
 
   try {
     const studentInfo = db
@@ -247,6 +317,19 @@ app.get("/entry/:studentId", requireStudentAccess, (req, res) => {
          ORDER BY subjectName`
       )
       .all(studentInfo.teacherID);
+
+      //goals
+      const goals = db.prepare(`
+        SELECT studentSubjectID, studentGoal
+        FROM studentGoals
+        WHERE studentID = ?
+      `).all(studentId);
+
+      // Map goals to subject objects
+      subjects.forEach(subj => {
+        const goalRow = goals.find(g => g.studentSubjectID === subj.subjectID);
+        subj.goal = goalRow ? goalRow.studentGoal : null;
+      });
 
     const allScores = db
       .prepare(
@@ -283,6 +366,35 @@ app.get("/entry/:studentId", requireStudentAccess, (req, res) => {
   } catch (err) {
     console.error("Error loading entry page:", err);
     res.status(500).send("Error loading entry page");
+  }
+});
+
+app.post("/set-goal", (req, res) => {
+  const { studentId, subjectId, studentGoal } = req.body;
+  let goalValue = parseFloat(studentGoal);
+
+  // ✅ Convert whole numbers to decimals automatically
+  if (goalValue > 1) {
+    goalValue = goalValue / 100;
+  }
+
+  // ✅ Sanity check: must be between 0 and 1
+  if (isNaN(goalValue) || goalValue < 0 || goalValue > 1) {
+    return res.status(400).send("Invalid goal value (must be between 0 and 1, or 0–100%).");
+  }
+
+  try {
+    db.prepare(`
+      INSERT INTO studentGoals (studentID, studentSubjectID, studentGoal)
+      VALUES (?, ?, ?)
+      ON CONFLICT(studentID, studentSubjectID)
+      DO UPDATE SET studentGoal = excluded.studentGoal
+    `).run(studentId, subjectId, goalValue);
+
+    res.redirect(`/entry/${studentId}`);
+  } catch (err) {
+    console.error("Error saving goal:", err);
+    res.status(500).send("Database error saving goal.");
   }
 });
 
@@ -340,6 +452,33 @@ app.post("/submit-score", (req, res) => {
   }
 });
 
+app.post("/delete-score", (req, res) => {
+  const { scoreId, studentId } = req.body;
+
+  // Only teachers can delete
+  if (!req.session.teacherId) {
+    return res.status(403).send("Unauthorized");
+  }
+
+  try {
+    // Ensure the score belongs to one of this teacher’s students
+    const result = db.prepare(`
+      DELETE FROM scores
+      WHERE scoreID = ?
+      AND scoreTeacherID = ?
+    `).run(scoreId, req.session.teacherId);
+
+    if (result.changes === 0) {
+      return res.status(403).send("Cannot delete this score.");
+    }
+
+    res.redirect(`/entry/${studentId}`);
+  } catch (err) {
+    console.error("Error deleting score:", err);
+    res.status(500).send("Database error");
+  }
+});
+
 // ────────────────────────────────────────────────────────────────────────────────
 // STATS PAGE
 // ────────────────────────────────────────────────────────────────────────────────
@@ -393,6 +532,27 @@ app.get("/stats/:studentId", requireStudentAccess, (req, res) => {
       dates: data.dates,
       scores: data.scores,
     }));
+
+
+    const goals = db.prepare(`
+      SELECT studentSubjectID, studentGoal
+      FROM studentGoals
+      WHERE studentID = ?
+    `).all(studentId);
+
+    // Map subject IDs to goal values
+    const goalMap = {};
+    goals.forEach(g => goalMap[g.studentSubjectID] = g.studentGoal);
+
+    // Add goals to graph objects
+    graphs.forEach(g => {
+      const subjectRow = db.prepare("SELECT subjectID FROM subjects WHERE subjectName = ?").get(g.subjectName);
+      if (subjectRow && goalMap[subjectRow.subjectID]) {
+        g.goal = goalMap[subjectRow.subjectID] * 100; // convert to %
+      } else {
+        g.goal = null;
+      }
+    });
 
     const subjectChanges = Object.entries(subjects).map(([subjectName, data]) => {
       if (data.scores.length < 2) return { subjectName, change: 0, direction: "no change" };

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Student Stats</title>
+  <title>Student Stats - SparkeMarke</title>
 
   <!-- Bootstrap -->
   <link
@@ -23,6 +23,19 @@
     .card {
         border-radius: 10px;
     }
+    .chart-container {
+      height: 175px !important;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chart-container canvas {
+      height: 100% !important;
+      width: 100% !important;
+      max-height: 175px !important;
+    }
+
     </style>
 
     <script>
@@ -60,7 +73,15 @@
 
     <div>
       <a href="/entry/<%= studentInfo.studentID %>" class="btn btn-outline-primary me-2">Back to Entry</a>
-      <a href="/" class="btn btn-outline-danger">Exit</a>
+        <% if (loggedInTeacherId) { %>
+          <a href="/teacher/<%= studentInfo.teacherID %>" class="btn btn-outline-danger">
+            Exit
+          </a>
+        <% } else { %>
+          <a href="/logout-student" class="btn btn-outline-danger">
+            Exit
+          </a>
+        <% } %>
     </div>
   </div>
 
@@ -94,7 +115,9 @@
         <div class="col-md-6 mb-4">
             <div class="card shadow-sm p-3">
             <h5 class="text-center"><%= g.subjectName %></h5>
-            <canvas id="chart_<%= idx %>" height="150"></canvas>
+            <div class="chart-container">
+              <canvas id="chart_<%= idx %>"></canvas>
+            </div>
             </div>
         </div>
         <% if ((idx + 1) % 2 === 0) { %>
@@ -106,119 +129,148 @@
     <p class="text-muted">No chart data available yet.</p>
     <% } %>
 
-
     <script>
-    <% graphs.forEach((g, idx) => { %>
-        const ctx<%= idx %> = document.getElementById("chart_<%= idx %>").getContext("2d");
+      
+<% graphs.forEach((g, idx) => { %>
+{
+  const ctx = document.getElementById("chart_<%= idx %>").getContext("2d");
 
-        // Format date labels to 'MMM-DD'
-        const formattedDates_<%= idx %> = <%- JSON.stringify(g.dates) %>.map(dateStr => {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
-        });
+  // Format labels to 'MMM-DD'
+  const formattedDates = <%- JSON.stringify(g.dates) %>.map(dateStr => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+  });
 
-        const color_<%= idx %> = subjectColors["<%= g.subjectName %>"] || subjectColors.Default;
+  const subjectColor = subjectColors["<%= g.subjectName %>"] || subjectColors.Default;
+  const goalColor = "rgba(255, 99, 132, 0.9)"; // dashed goal line
 
-        new Chart(ctx<%= idx %>, {
-        type: "line",
-        data: {
-            labels: formattedDates_<%= idx %>,
-            datasets: [{
-            label: "<%= g.subjectName %>",
-            data: <%- JSON.stringify(g.scores) %>,
-            fill: false,
-            borderColor: color_<%= idx %>,
-            borderWidth: 2,
-            tension: 0.3,
-            pointRadius: 4,
-            pointBackgroundColor: color_<%= idx %>
-            }]
+  const datasets = [
+    {
+      label: "<%= g.subjectName %>",
+      data: <%- JSON.stringify(g.scores) %>,
+      fill: false,
+      borderColor: subjectColor,
+      borderWidth: 2,
+      tension: 0.3,
+      pointRadius: 4,
+      pointBackgroundColor: subjectColor
+    }
+  ];
+
+  <% if (g.goal) { %>
+  datasets.push({
+    label: "Goal (<%= g.goal %>%)",
+    data: Array(<%= g.scores.length %>).fill(<%= g.goal %>),
+    borderColor: goalColor,
+    borderDash: [6, 4],
+    borderWidth: 2,
+    pointRadius: 0,
+    fill: false
+  });
+  <% } %>
+
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: formattedDates,
+      datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          title: {
+            display: true,
+            text: "Score (%)"
+          }
         },
-        options: {
-            responsive: true,
-            scales: {
-            y: {
-                beginAtZero: true,
-                max: 100,
-                title: { display: true, text: "Score (%)" }
-            },
-            x: {
-                title: { display: false },
-                ticks: {
-                autoSkip: true,
-                maxTicksLimit: 8
-                }
-            }
-            },
-            plugins: { legend: { display: false } }
+        x: {
+          ticks: { autoSkip: true, maxTicksLimit: 8 },
+          title: { display: false }
         }
-        });
-    <% }) %>
-    </script>
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: { mode: "index", intersect: false }
+      },
+      interaction: { mode: "nearest", axis: "x", intersect: false }
+    }
+  });
+}
+<% }) %>
+</script>
 
+  <!-- END LINE GRAPHS -->
 
     <!-- BOX PLOTS -->
 <h2 class="mb-3 mt-5">Class Comparison (Box Plots)</h2>
 
-<% if (boxPlots && boxPlots.length > 0) { %>
-  <div class="row">
-    <% boxPlots.forEach((b, idx) => { %>
-      <div class="col-md-3 mb-4">
-        <div class="card shadow-sm p-3">
-          <h6 class="text-center"><%= b.subjectName %></h6>
-          <div id="box_<%= idx %>" style="height:250px;"></div>
+  <% if (boxPlots && boxPlots.length > 0) { %>
+    <div class="row">
+      <% boxPlots.forEach((b, idx) => { %>
+        <div class="col-md-3 mb-4">
+          <div class="card shadow-sm p-3">
+            <h6 class="text-center"><%= b.subjectName %></h6>
+            <div id="box_<%= idx %>" style="height:250px;"></div>
+          </div>
         </div>
-      </div>
-      <% if ((idx + 1) % 4 === 0) { %>
-        </div><div class="row">
-      <% } %>
-    <% }) %>
-  </div>
-<% } else { %>
-  <p class="text-muted">No class comparison data available yet.</p>
-<% } %>
+        <% if ((idx + 1) % 4 === 0) { %>
+          </div><div class="row">
+        <% } %>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <p class="text-muted">No class comparison data available yet.</p>
+  <% } %>
 
 
     <script>
     <% boxPlots.forEach((b, idx) => { %>
-        const scores_<%= idx %> = <%- JSON.stringify(b.allScores || []) %>;
-        const avg_<%= idx %> = <%= b.studentAvg || 0 %>;
+    {
+      const scores = <%- JSON.stringify(b.allScores || []) %>;
+      const avg = <%= b.studentAvg || 0 %>;
+      const subjectColor = subjectColors["<%= b.subjectName %>"] || subjectColors.Default;
 
-        //console.log("Subject:", "<%= b.subjectName %>", "Scores:", scores_<%= idx %>);
-
-        //const color_<%= idx %> = subjectColors["<%= b.subjectName %>"] || subjectColors.Default;
-
-        const boxTrace_<%= idx %> = {
+      const boxTrace = {
         type: "box",
-        y: scores_<%= idx %>,
+        y: scores,
         name: "<%= b.subjectName %>",
         boxmean: false,
-        fillcolor: color_<%= idx %>.replace('1)', '0.3)'), // semi-transparent fill
-        line: { color: color_<%= idx %> },
+        fillcolor: subjectColor.replace('1)', '0.3)'), // semi-transparent fill
+        line: { color: subjectColor },
         marker: { opacity: 0.6 }
-        };
+      };
 
-        const avgTrace_<%= idx %> = {
+      const avgTrace = {
         type: "scatter",
         mode: "markers",
         name: "Your Avg",
         x: ["<%= b.subjectName %>"],
-        y: [avg_<%= idx %>],
+        y: [avg],
         marker: { size: 10, color: "red" },
         hovertemplate: "%{y:.0f}%<extra>Your Avg</extra>"
-        };
+      };
 
-
-        const layout_<%= idx %> = {
-        margin: { t: 10, r: 10, b: 50, l: 50 },
+      const layout = {
+        margin: { t: 10, r: 10, b: 10, l: 50 },
         yaxis: { range: [0, 100], title: "Score (%)" },
+        xaxis: { showticklabels: false, title: "" }, // ⬅ hides bottom labels
         boxmode: "group",
-        showlegend: false
-        };
+        showlegend: false,
+      };
 
-        Plotly.newPlot("box_<%= idx %>", [boxTrace_<%= idx %>, avgTrace_<%= idx %>], layout_<%= idx %>, { responsive: true });
+      Plotly.newPlot("box_<%= idx %>", [boxTrace, avgTrace], layout, { responsive: true });
+    }
     <% }) %>
     </script>
+
+
+
 
 </body>
 </html>
