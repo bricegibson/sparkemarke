@@ -5,7 +5,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 
   <style>
-    /* Smooth fade-in for the student section */
     #studentSection {
       opacity: 0;
       transition: opacity 0.6s ease-in;
@@ -13,12 +12,24 @@
     #studentSection.visible {
       opacity: 1;
     }
+    .leaderboard-card {
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      background: white;
+      padding: 1rem;
+      margin-bottom: 2rem;
+    }
+    body {
+      max-width: 95%;
+      margin: 0 auto;
+      background-color: #f8f9fa;
+    }
   </style>
 
 </head>
 <body class="container mt-5">
 
-  <h1 class="mb-4">Welcome to SparkeMarke!</h1>
+  <h1 class="mb-4 text-center">Welcome to SparkeMarke!</h1>
 
   <!-- Code Entry -->
   <form id="codeForm" class="mb-4">
@@ -35,12 +46,11 @@
       </div>
       <p class="mt-2">Verifying code...</p>
     </div>
-
   </form>
 
   <div id="message" class="mt-3"></div>
 
-  <!-- Student Selection (hidden initially) -->
+  <!-- Student Selection -->
   <div id="studentSection" class="mb-4" style="display:none;">
     <form action="/student-login" method="POST">
       <input type="hidden" name="teacherId" id="teacherId">
@@ -59,6 +69,45 @@
 
   <div id="message" class="mt-3 text-danger"></div>
 
+  <hr class="my-4">
+
+  <!-- 🏆 Leaderboards Section -->
+  <h3 class="mb-3 text-center">🏆 Subject Leaderboards</h3>
+
+  <% if (!leaderboards || Object.keys(leaderboards).length === 0) { %>
+    <p class="text-muted text-center">No leaderboard data available yet.</p>
+  <% } else { %>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+      <% Object.keys(leaderboards).forEach(subjectName => { %>
+        <div class="col">
+          <div class="leaderboard-card">
+            <h5 class="text-center mb-3"><%= subjectName %></h5>
+            <table class="table table-sm table-bordered mb-0 align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Rank</th>
+                  <th>Student</th>
+                  <th>School</th>
+                  <th>Avg</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% leaderboards[subjectName].forEach((row, index) => { %>
+                  <tr>
+                    <td><%= index + 1 %></td>
+                    <td><%= row.studentName %></td>
+                    <td><%= row.schoolName %></td>
+                    <td><%= row.avgScore.toFixed(2) %>%</td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
   <script>
     const spinner = document.getElementById("spinner");
     const messageDiv = document.getElementById("message");
@@ -69,7 +118,7 @@
       e.preventDefault();
       const code = document.getElementById("code").value.trim().toUpperCase();
       messageDiv.textContent = "";
-      spinner.style.display = "block"; // 🔹 Show spinner
+      spinner.style.display = "block";
       studentSection.style.display = "none";
 
       try {
@@ -80,7 +129,7 @@
         });
 
         const data = await res.json();
-        spinner.style.display = "none"; // 🔹 Hide spinner after response
+        spinner.style.display = "none";
 
         if (!data.valid) {
           messageDiv.className = "mt-3 text-danger fw-bold";
@@ -88,11 +137,11 @@
           return;
         }
 
-        // after success:
+        // Success
         messageDiv.className = "mt-3 text-success fw-bold";
         messageDiv.innerHTML = `✅ Code verified for <strong>${data.teacherName || "your teacher"}'s</strong> class.`;
 
-        // populate dropdown…
+        // Populate dropdown
         const select = document.getElementById("studentId");
         select.innerHTML = '<option value="">-- choose a student --</option>';
         data.students.forEach(s => {
@@ -102,9 +151,9 @@
           select.appendChild(opt);
         });
 
-        // store teacherId + code for the POST /student-login
+        // Store teacherId + code
         document.getElementById("teacherId").value = data.teacherId;
-        document.getElementById("codeHidden").value = code.trim().toUpperCase();  // ⬅️ IMPORTANT
+        document.getElementById("codeHidden").value = code;
 
         studentSection.style.display = "block";
         setTimeout(() => studentSection.classList.add("visible"), 50);
@@ -116,6 +165,49 @@
         console.error(err);
       }
     });
+  </script>
+
+  <script>
+    const subjectColors = {
+      math:    "rgba(255, 99, 132, 0.15)",
+      science: "rgba(54, 162, 235, 0.15)",
+      fluency: "rgba(255, 206, 86, 0.25)",
+      history: "rgba(75, 192, 192, 0.2)",
+      art:     "rgba(153, 102, 255, 0.15)",
+      default: "rgba(201, 203, 207, 0.2)"
+    };
+
+    const headerColors = {
+      // math:    "rgba(255, 99, 132, 0.4)",
+      // science: "rgba(54, 162, 235, 0.4)",
+      // fluency: "rgba(255, 206, 86, 0.6)",
+      // history: "rgba(75, 192, 192, 0.5)",
+      // art:     "rgba(153, 102, 255, 0.4)",
+      default: "rgba(0, 0, 0, 1)"
+    };
+
+    document.querySelectorAll(".leaderboard-card").forEach(card => {
+      // Try data-subject first
+      let subjectRaw = card.getAttribute("data-subject");
+
+      // Fallback: read from the <h5> title if attribute is missing
+      if (!subjectRaw || subjectRaw.trim() === "") {
+        const h5 = card.querySelector("h5");
+        subjectRaw = h5 ? h5.textContent : "";
+      }
+
+      const key = (subjectRaw || "").trim().toLowerCase();
+      const bgColor = subjectColors[key] || subjectColors.default;
+      const headColor = headerColors[key] || headerColors.default;
+
+      // Card background tint
+      card.style.backgroundColor = bgColor;
+
+      // Table header accent
+      const thead = card.querySelector("thead");
+      if (thead) thead.style.backgroundColor = headColor;
+    });
+
   </script>
 
 

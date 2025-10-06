@@ -174,16 +174,47 @@ app.get("/teacher-logout", (req, res) => {
 // ────────────────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   try {
-    const teachers = db.prepare(`
-      SELECT t.teacherID, t.teacherName, s.schoolName AS schoolName
+    // --- Load all teachers ---
+    const teacherSql = `
+      SELECT t.teacherID, t.teacherName, s.schoolName
       FROM teachers t
       LEFT JOIN schools s ON t.teacherSchoolID = s.schoolID
-    `).all();
+    `;
+    const teachers = db.prepare(teacherSql).all();
 
-    res.render("index", { teachers });
+    // --- Build leaderboard data ---
+    const leaderboardSql = `
+      SELECT
+        sub.subjectID,
+        sub.subjectName,
+        stu.studentName,
+        sch.schoolName,
+        AVG(sc.scoreActual) * 100 AS avgScore
+      FROM scores sc
+      JOIN students stu ON sc.scoreStudentID = stu.studentID
+      JOIN teachers t ON sc.scoreTeacherID = t.teacherID
+      JOIN schools sch ON t.teacherSchoolID = sch.schoolID
+      JOIN subjects sub ON sc.scoreSubjectID = sub.subjectID
+      GROUP BY sub.subjectID, stu.studentID
+      ORDER BY sub.subjectName, avgScore DESC
+    `;
+    const allScores = db.prepare(leaderboardSql).all();
+
+    // --- Group top 5 students per subject ---
+    const leaderboards = {};
+    for (const row of allScores) {
+      if (!leaderboards[row.subjectName]) leaderboards[row.subjectName] = [];
+      if (leaderboards[row.subjectName].length < 5) {
+        leaderboards[row.subjectName].push(row);
+      }
+    }
+
+    // --- Render ---
+    res.render("index", { teachers, leaderboards });
+
   } catch (err) {
-    console.error(err);
-    res.render("index", { teachers: [] });
+    console.error("Error loading index:", err);
+    res.status(500).send("Internal server error");
   }
 });
 
