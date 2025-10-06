@@ -3,4 +3,5 @@ old/
 node_modules/
 .env
 .DS_Store
-students_org.db
+var/data/students_org.db
+var/data/students.db
