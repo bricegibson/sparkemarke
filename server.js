@@ -34,6 +34,8 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(express.json());
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Middleware
 // ────────────────────────────────────────────────────────────────────────────────
@@ -717,6 +719,29 @@ app.post("/admin/teachers", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.send("Error adding teacher.");
+  }
+});
+
+// 🗑️ Delete teacher
+app.post("/admin/teachers/update", requireAdmin, async (req, res) => {
+  const { teacherID, teacherName, teacherGradeLevel, teacherEmail, newPassword } = req.body;
+
+  try {
+    db.prepare(`
+      UPDATE teachers
+      SET teacherName = ?, teacherGradeLevel = ?, teacherEmail = ?
+      WHERE teacherID = ?
+    `).run(teacherName, teacherGradeLevel, teacherEmail, teacherID);
+
+    if (newPassword && newPassword.trim() !== "") {
+      const hashed = await bcrypt.hash(newPassword.trim(), 10);
+      db.prepare(`UPDATE teachers SET teacherPassword = ? WHERE teacherID = ?`).run(hashed, teacherID);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error updating teacher:", err);
+    res.status(500).json({ success: false });
   }
 });
 
