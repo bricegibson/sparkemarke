@@ -40,6 +40,8 @@ function ensureTableExists(table, createSQL) {
   }
 }
 
+db.prepare(`UPDATE schools SET schoolName = 'Wolverine Elementary' WHERE schoolID = '1DCDWE'`).run();
+
 function migrateDatabase() {
   console.log("🔍 Running database migration checks...");
 

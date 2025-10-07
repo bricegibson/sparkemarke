@@ -137,10 +137,11 @@
                       <td><%= t.teacherGradeLevel || "—" %></td>
                       <td><%= t.schoolName || "—" %></td>
                       <td><%= t.teacherEmail || "—" %></td>
-                      
+
                       <td class="text-nowrap">
                         <div class="d-flex align-items-center gap-2">
-                          <button class="btn btn-sm btn-primary edit-btn"
+                          <button type="button" class="btn btn-sm btn-outline-primary"
+                          data-bs-toggle="modal" data-bs-target="#editTeacherModal"
                                   data-id="<%= t.teacherID %>"
                                   data-name="<%= t.teacherName %>"
                                   data-grade="<%= t.teacherGradeLevel %>"
