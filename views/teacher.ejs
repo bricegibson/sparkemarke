@@ -11,7 +11,7 @@
     <a href="/teacher-logout" class="btn btn-outline-secondary btn-sm">Logout</a>
     </header>
 
-    <h3>Class: <%= teacher.teacherName %> (<%= teacher.schoolName || "No School" %>)</h3>
+    <h3><%= teacher.teacherGradeLevel || "(Grade Level Not set)" %> Grade, <%= teacher.schoolName || "(School Not Set)" %></h3>
     <hr>
 
     <a href="/teacher/<%= teacher.teacherID %>/password" class="btn btn-warning btn-sm">Change Password</a>

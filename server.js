@@ -3,9 +3,13 @@ const bodyParser = require("body-parser");
 const session = require("express-session");
 const bcrypt = require("bcrypt");
 
-const db = require("./database"); // must be a better-sqlite3 Database instance
+const { db, migrateDatabase } = require("./database");
+migrateDatabase();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+process.env.TZ = "America/Denver";
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
@@ -656,12 +660,17 @@ app.get("/admin", requireAdmin, (req, res) => {
     const schools = db.prepare(`SELECT * FROM schools`).all();
 
     const teachers = db
-      .prepare(
-        `SELECT t.teacherID, t.teacherName, s.schoolName
-         FROM teachers t
-         LEFT JOIN schools s ON t.teacherSchoolId = s.schoolID`
-      )
-      .all();
+      .prepare(`
+        SELECT 
+          t.teacherID, 
+          t.teacherName, 
+          t.teacherGradeLevel,
+          t.teacherEmail,
+          s.schoolName
+        FROM teachers t
+        LEFT JOIN schools s ON t.teacherSchoolId = s.schoolID
+        ORDER BY s.schoolName, t.teacherName
+      `).all();
 
     const subjects = db
       .prepare(
@@ -697,13 +706,13 @@ app.post("/admin/schools", requireAdmin, (req, res) => {
 });
 
 app.post("/admin/teachers", requireAdmin, async (req, res) => {
-  const { id, name, schoolId, password } = req.body;
+  const { id, name, schoolId, password, gradeLevel, email } = req.body;
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    db.prepare(
-      `INSERT INTO teachers (teacherID, teacherName, teacherSchoolID, teacherPassword)
-       VALUES (?, ?, ?, ?)`
-    ).run(id, name, schoolId, hashedPassword);
+    db.prepare(`
+      INSERT INTO teachers (teacherID, teacherName, teacherSchoolID, teacherPassword, teacherGradeLevel, teacherEmail)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, name, schoolId, hashedPassword, gradeLevel, email);
     res.redirect("/admin");
   } catch (err) {
     console.error(err);
@@ -735,7 +744,7 @@ app.get("/teacher/:teacherId", requireTeacherAccess, (req, res) => {
   try {
     const teacher = db
       .prepare(
-        `SELECT t.teacherID, t.teacherName, s.schoolName AS schoolName
+        `SELECT t.teacherID, t.teacherName, t.teacherGradeLevel, t.teacherEmail, s.schoolName
          FROM teachers t
          LEFT JOIN schools s ON t.teacherSchoolID = s.schoolID
          WHERE t.teacherID = ?`
