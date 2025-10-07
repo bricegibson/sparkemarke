@@ -137,26 +137,23 @@
                       <td><%= t.teacherGradeLevel || "—" %></td>
                       <td><%= t.schoolName || "—" %></td>
                       <td><%= t.teacherEmail || "—" %></td>
-                      <td>
-                        <form action="/admin/teachers/<%= t.teacherID %>/delete" method="POST" class="d-inline">
-                          <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this teacher?');">
-                            🗑️
+                      
+                      <td class="text-nowrap">
+                        <div class="d-flex align-items-center gap-2">
+                          <button class="btn btn-sm btn-primary edit-btn"
+                                  data-id="<%= t.teacherID %>"
+                                  data-name="<%= t.teacherName %>"
+                                  data-grade="<%= t.teacherGradeLevel %>"
+                                  data-email="<%= t.teacherEmail %>">
+                            ✏️
                           </button>
-                        </form>
 
-                        <!-- Edit Button (opens modal) -->
-                        <button type="button"
-                          class="btn btn-sm btn-outline-primary"
-                          data-bs-toggle="modal"
-                          data-bs-target="#editTeacherModal"
-                          data-id="<%= t.teacherID %>"
-                          data-name="<%= t.teacherName %>"
-                          data-grade="<%= t.teacherGradeLevel || '' %>"
-                          data-email="<%= t.teacherEmail || '' %>">
-                          ✏️
-                        </button>
-
+                          <form class="delete-teacher-form" data-id="<%= t.teacherID %>" style="margin:0;">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">🗑️</button>
+                          </form>
+                        </div>
                       </td>
+
                     </tr>
                   <% }) %>
                 <% } else { %>
@@ -288,6 +285,11 @@
 
         modal.hide(); // ✅ close the modal
         showToast("✅ Teacher updated successfully");
+
+        setTimeout(() => {
+          location.reload();
+        }, 1500);
+
       } catch (err) {
         console.error(err);
         showToast("❌ Error updating teacher", true);
@@ -315,6 +317,27 @@
 
       toastEl.addEventListener("hidden.bs.toast", () => toastContainer.remove());
     }
+
+    document.querySelectorAll(".delete-teacher-form").forEach(form => {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const teacherId = form.dataset.id;
+
+        if (!confirm("Are you sure you want to delete this teacher?")) return;
+
+        try {
+          const res = await fetch(`/admin/teachers/${teacherId}/delete`, { method: "POST" });
+          if (!res.ok) throw new Error("Delete failed");
+
+          showToast("🗑️ Teacher deleted");
+          setTimeout(() => location.reload(), 1000);
+        } catch (err) {
+          console.error(err);
+          showToast("❌ Error deleting teacher", true);
+        }
+      });
+    });
+
   });
   </script>
 
