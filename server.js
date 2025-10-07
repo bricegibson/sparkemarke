@@ -870,7 +870,7 @@ app.post("/teacher/:teacherId/new-code", requireTeacherAccess, (req, res) => {
   }
 });
 
-app.get("/teacher/:teacherId/stats",  (req, res) => {
+app.get("/teacher/:teacherId/stats", requireTeacherAccess, (req, res) => {
   const { teacherId } = req.params;
 
   const teacher = db.prepare(`
