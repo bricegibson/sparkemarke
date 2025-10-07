@@ -849,6 +849,24 @@ app.post("/teacher/:teacherId/delete-student/:studentId", requireTeacherAccess, 
   }
 });
 
+app.post("/teacher/:teacherId/edit-student/:studentId", requireTeacherAccess, (req, res) => {
+  const { teacherId, studentId } = req.params;
+  const { studentName } = req.body;
+
+  try {
+    const stmt = db.prepare(`
+      UPDATE students
+      SET studentName = ?
+      WHERE studentID = ? AND studentTeacherID = ?
+    `);
+    stmt.run(studentName, studentId, teacherId);
+    res.redirect(`/teacher/${teacherId}`);
+  } catch (err) {
+    console.error("Error updating student name:", err);
+    res.status(500).send("Database error updating student name.");
+  }
+});
+
 app.post("/teacher/:teacherId/new-code", requireTeacherAccess, (req, res) => {
   const teacherId = req.params.teacherId;
   const code = generateCode();
