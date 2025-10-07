@@ -870,56 +870,60 @@ app.post("/teacher/:teacherId/new-code", requireTeacherAccess, (req, res) => {
   }
 });
 
-app.get("/teacher/:teacherId/stats", requireTeacherAccess, (req, res) => {
+app.get("/teacher/:teacherId/stats",  (req, res) => {
   const { teacherId } = req.params;
 
-  const teacher = db
-    .prepare(`
-      SELECT t.teacherID, t.teacherName, s.schoolName
-      FROM teachers t
-      LEFT JOIN schools s ON t.teacherSchoolID = s.schoolID
-      WHERE t.teacherID = ?
-    `)
-    .get(teacherId);
+  const teacher = db.prepare(`
+    SELECT t.teacherID, t.teacherName, s.schoolName
+    FROM teachers t
+    LEFT JOIN schools s ON t.teacherSchoolID = s.schoolID
+    WHERE t.teacherID = ?
+  `).get(teacherId);
 
   if (!teacher) return res.status(404).send("Teacher not found");
 
-  // 🔹 Get all subjects for this teacher
-  const subjects = db
-    .prepare(`SELECT subjectID, subjectName FROM subjects WHERE subjectTeacherID = ? ORDER BY subjectName`)
-    .all(teacherId);
+  const subjects = db.prepare(`
+    SELECT subjectID, subjectName
+    FROM subjects
+    WHERE subjectTeacherID = ?
+    ORDER BY subjectName
+  `).all(teacherId);
 
-  // 🔹 For each subject, collect all scores
-  const subjectBoxPlots = subjects.map((subj) => {
-    const scores = db
-      .prepare(`
+  const subjectBoxPlots = subjects.map(subj => {
+    const rows = db.prepare(`
         SELECT 
           sc.scoreSubjectID
-          ,AVG(sc.scoreActual) AS avgScore
+          ,AVG(sc.scoreActual) * 100 AS avgScore
           ,su.subjectName
           ,sc.scoreStudentID
           ,st.studentName
+		      ,strftime('%Y-%m', sc.scoreDate) AS monthOf
         FROM scores sc
           JOIN subjects su ON sc.scoreSubjectID = su.subjectID
           JOIN students st ON sc.scoreStudentID = st.studentID
         WHERE scoreTeacherID = ?
           AND su.subjectID = ?
 
-        GROUP BY sc.scoreSubjectID ,su.subjectName ,sc.scoreStudentID,st.studentName
-      `)
-      .all(teacherId, subj.subjectID);
-    
-    const allScores = scores.filter(s => s.avgScore !== null).map(s => +(s.avgScore * 100).toFixed(2));
-    const studentNames = scores.map(s => s.studentName);
+        GROUP BY sc.scoreSubjectID ,su.subjectName ,sc.scoreStudentID,st.studentName,monthOf
+      ORDER BY monthOf
+    `).all(teacherId, subj.subjectID);
 
-    return {
-      subjectName: subj.subjectName,
-      allScores,
-      studentNames
-    };
+    const months = [...new Set(rows.map(r => r.monthOf))];
+    const dataByMonth = months.map(month => rows.filter(r => r.monthOf === month).map(r => +r.avgScore.toFixed(2)));
+
+    // Each student’s points per month for overlay scatter plot
+    const points = rows.map(r => ({
+      x: r.month,
+      y: +r.avgScore.toFixed(2),
+      name: r.studentName
+    }));
+
+    return { subjectName: subj.subjectName, months, dataByMonth, points };
   });
+
   res.render("teacher-stats", { teacher, subjectBoxPlots });
 });
+
 
 // ────────────────────────────────────────────────────────────────────────────────
 // TEACHER PASSWORD UPDATE

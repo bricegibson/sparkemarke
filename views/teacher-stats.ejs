@@ -6,89 +6,152 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.2.4/build/index.umd.min.js"></script>
 
-  <script>
-        // 🔹 Consistent subject colors
-    const subjectColors = {
-        Math: "rgba(255, 99, 132, 1)",        // red
-        Science: "rgba(54, 162, 235, 1)",     // blue
-        Fluency: "rgba(255, 206, 86, 1)",     // yellow
-        History: "rgba(75, 192, 192, 1)",     // teal
-        Art: "rgba(153, 102, 255, 1)",        // purple
-        Default: "rgba(201, 203, 207, 1)"     // gray
-    };
-  </script>
-  
-    <style>
-    .body-container {
+  <style>
+    .chart-row {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .chart-card {
+      width: 100%;
+      background: #fafafa;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 16px;
+
+    }
+
+    .chart-card canvas {
+      width: 100%;
+      height: 240px !important; /* ✅ balanced height */
+    }
+
+    body {
       width: 85%;
       margin: 0 auto; /* center horizontally */
-    }        
-    .chart-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-    }
-    .chart-card {
-        flex: 1 1 calc(33.333% - 20px); /* 🔹 three per row */
-        background: #fafafa;
-        border-radius: 12px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        padding: 16px;
-    }
-    </style>
-
+    }    
+  </style>
 </head>
+
 <body class="mt-4">
-    <div class="body-container">
-    <h2><%= teacher.teacherName %> – Class Statistics</h2>
-    <p class="text-muted"><%= teacher.schoolName %></p>
+  <h2><%= teacher.teacherName %> – Class Performance by Month</h2>
+  <p class="text-muted"><%= teacher.schoolName %></p>
 
-    <div class="chart-row">
-        <% subjectBoxPlots.forEach((subj, i) => { %>
-        <div class="chart-card">
-            <h5 class="text-center mb-3"><%= subj.subjectName %></h5>
-            <canvas id="chart_<%= i %>" height="200"></canvas>
-        </div>
-        <% }) %>
-    </div>
-    </div>
+  <div class="chart-row">
+    <% subjectBoxPlots.forEach((subj, i) => { %>
+      <div class="chart-card">
+        <h5 class="text-center mb-3"><%= subj.subjectName %></h5>
+        <canvas id="chart_<%= i %>"></canvas>
+      </div>
+    <% }) %>
+  </div>
 
-<script>
-  const subjectBoxPlots = <%- JSON.stringify(subjectBoxPlots) %>;
+  <script>
+    const subjectBoxPlots = <%- JSON.stringify(subjectBoxPlots) %>;
 
-  subjectBoxPlots.forEach((subj, i) => {
-    const ctx = document.getElementById(`chart_${i}`);
-    if (!ctx) return;
+    const subjectColors = {
+      Math: "rgba(255, 99, 132, 1)",
+      Science: "rgba(54, 162, 235, 1)",
+      Fluency: "rgba(255, 206, 86, 1)",
+      History: "rgba(75, 192, 192, 1)",
+      Art: "rgba(153, 102, 255, 1)",
+      Default: "rgba(201, 203, 207, 1)"
+    };
 
-    const color = subjectColors[subj.subjectName] || subjectColors.Default;
+    subjectBoxPlots.forEach((subj, i) => {
+      const ctx = document.getElementById(`chart_${i}`);
+      if (!ctx) return;
 
-    new Chart(ctx, {
-      type: "boxplot",
-      data: {
-        labels: ["Class Distribution"],
-        datasets: [{
-          label: subj.subjectName,
-          data: [subj.allScores],
-          backgroundColor: color.replace("1)", "0.2)"),  // lighter fill
-          borderColor: color,
-          borderWidth: 2,
-          itemRadius: 5
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          title: { display: true, text: subj.subjectName },
-          legend: { display: false }
+      const color = subjectColors[subj.subjectName] || subjectColors.Default;
+
+      // const values = subj.dataByMonth.map(v => v.value * 100); // assuming decimals → %
+
+      const values = (subj.dataByMonth || [])
+      .map(v => parseFloat(v))   // convert to number
+      .filter(v => !isNaN(v));   // remove NaN or invalid entries
+
+      if (values.length === 0) return; // skip if no usable data
+
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+
+      // pad the range ±10%
+      const rangePadding = 10;
+      const yMin = Math.max(0, min - rangePadding);
+      const yMax = Math.min(100, max + rangePadding);
+
+      const diff = yMax - yMin;
+      if (diff < 10) {  // too narrow
+        yMin = Math.max(0, yMin - (10 - diff) / 2);
+        yMax = Math.min(100, yMax + (10 - diff) / 2);
+      }   
+
+
+      new Chart(ctx, {
+        type: "boxplot",
+        data: {
+          labels: subj.months,
+          datasets: [
+            {
+              label: "Class Distribution",
+              data: subj.dataByMonth,
+              backgroundColor: color.replace("1)", "0.25)"),
+              borderColor: color,
+              borderWidth: 1.5,
+              itemRadius: 4
+            },
+            {
+              label: "Student Averages",
+              type: "scatter",
+              data: subj.points,
+              parsing: { xAxisKey: "x", yAxisKey: "y" },
+              backgroundColor: color,
+              pointRadius: 5,
+              pointHoverRadius: 7
+            }
+          ]
         },
-        scales: {
-          y: { title: { display: true, text: "Average Score (%)" }, min: 0, max: 100 }
+        options: {
+          responsive: true,
+          plugins: {
+            title: { display: false },
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  if (ctx.dataset.type === "scatter") {
+                    const student = subj.points.find(p => p.x === ctx.parsed.x && p.y === ctx.parsed.y);
+                    return `${student ? student.name : "Student"}: ${ctx.parsed.y.toFixed(2)}%`;
+                  }
+                  return `Median: ${ctx.parsed.median || ""}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              title: { display: true, text: "Average (%)" },
+              min: yMin,
+              max: yMax
+            },
+          x: {
+              title: { display: false },
+              ticks: {
+                callback: function(value, index, values) {
+                  const label = this.getLabelForValue(value);
+                  const date = new Date(label);
+                  if (isNaN(date)) return label; // fallback if not a valid date
+                  const month = date.toLocaleString('default', { month: 'short' });
+                  const year = String(date.getFullYear()).slice(-2);
+                  return `${month}-${year}`;
+                }
+              }
+            }
+          }
         }
-      }
+      });
     });
-  });
-</script>
-
-
+  </script>
 </body>
 </html>
