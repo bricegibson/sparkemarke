@@ -722,7 +722,7 @@ app.post("/admin/teachers", requireAdmin, async (req, res) => {
   }
 });
 
-// 🗑️ Delete teacher
+// update teacher
 app.post("/admin/teachers/update", requireAdmin, async (req, res) => {
   const { teacherID, teacherName, teacherGradeLevel, teacherEmail, newPassword } = req.body;
 
@@ -742,6 +742,18 @@ app.post("/admin/teachers/update", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("Error updating teacher:", err);
     res.status(500).json({ success: false });
+  }
+});
+
+// 🗑️ Delete teacher
+app.post("/admin/teachers/:teacherId/delete", requireAdmin, (req, res) => {
+  const { teacherId } = req.params;
+  try {
+    db.prepare(`DELETE FROM teachers WHERE teacherID = ?`).run(teacherId);
+    res.redirect("/admin");
+  } catch (err) {
+    console.error("Error deleting teacher:", err);
+    res.status(500).send("Error deleting teacher");
   }
 });
 
