@@ -81,11 +81,11 @@
       const yMin = Math.max(0, min - rangePadding);
       const yMax = Math.min(100, max + rangePadding);
 
-      const diff = yMax - yMin;
-      if (diff < 10) {  // too narrow
-        yMin = Math.max(0, yMin - (10 - diff) / 2);
-        yMax = Math.min(100, yMax + (10 - diff) / 2);
-      }   
+      // const diff = yMax - yMin;
+      // if (diff < 10) {  // too narrow
+      //   yMin = Math.max(0, yMin - (10 - diff) / 2);
+      //   yMax = Math.min(100, yMax + (10 - diff) / 2);
+      // }   
 
 
       new Chart(ctx, {
