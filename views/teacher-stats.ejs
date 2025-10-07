@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= teacher.teacherName %> - Class Stats</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.2.4/build/index.umd.min.js"></script>
+
+  <script>
+        // 🔹 Consistent subject colors
+    const subjectColors = {
+        Math: "rgba(255, 99, 132, 1)",        // red
+        Science: "rgba(54, 162, 235, 1)",     // blue
+        Fluency: "rgba(255, 206, 86, 1)",     // yellow
+        History: "rgba(75, 192, 192, 1)",     // teal
+        Art: "rgba(153, 102, 255, 1)",        // purple
+        Default: "rgba(201, 203, 207, 1)"     // gray
+    };
+  </script>
+  
+    <style>
+    .body-container {
+      width: 85%;
+      margin: 0 auto; /* center horizontally */
+    }        
+    .chart-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    .chart-card {
+        flex: 1 1 calc(33.333% - 20px); /* 🔹 three per row */
+        background: #fafafa;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        padding: 16px;
+    }
+    </style>
+
+</head>
+<body class="mt-4">
+    <div class="body-container">
+    <h2><%= teacher.teacherName %> – Class Statistics</h2>
+    <p class="text-muted"><%= teacher.schoolName %></p>
+
+    <div class="chart-row">
+        <% subjectBoxPlots.forEach((subj, i) => { %>
+        <div class="chart-card">
+            <h5 class="text-center mb-3"><%= subj.subjectName %></h5>
+            <canvas id="chart_<%= i %>" height="200"></canvas>
+        </div>
+        <% }) %>
+    </div>
+    </div>
+
+<script>
+  const subjectBoxPlots = <%- JSON.stringify(subjectBoxPlots) %>;
+
+  subjectBoxPlots.forEach((subj, i) => {
+    const ctx = document.getElementById(`chart_${i}`);
+    if (!ctx) return;
+
+    const color = subjectColors[subj.subjectName] || subjectColors.Default;
+
+    new Chart(ctx, {
+      type: "boxplot",
+      data: {
+        labels: ["Class Distribution"],
+        datasets: [{
+          label: subj.subjectName,
+          data: [subj.allScores],
+          backgroundColor: color.replace("1)", "0.2)"),  // lighter fill
+          borderColor: color,
+          borderWidth: 2,
+          itemRadius: 5
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: { display: true, text: subj.subjectName },
+          legend: { display: false }
+        },
+        scales: {
+          y: { title: { display: true, text: "Average Score (%)" }, min: 0, max: 100 }
+        }
+      }
+    });
+  });
+</script>
+
+
+</body>
+</html>

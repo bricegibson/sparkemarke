@@ -870,6 +870,57 @@ app.post("/teacher/:teacherId/new-code", requireTeacherAccess, (req, res) => {
   }
 });
 
+app.get("/teacher/:teacherId/stats", requireTeacherAccess, (req, res) => {
+  const { teacherId } = req.params;
+
+  const teacher = db
+    .prepare(`
+      SELECT t.teacherID, t.teacherName, s.schoolName
+      FROM teachers t
+      LEFT JOIN schools s ON t.teacherSchoolID = s.schoolID
+      WHERE t.teacherID = ?
+    `)
+    .get(teacherId);
+
+  if (!teacher) return res.status(404).send("Teacher not found");
+
+  // 🔹 Get all subjects for this teacher
+  const subjects = db
+    .prepare(`SELECT subjectID, subjectName FROM subjects WHERE subjectTeacherID = ? ORDER BY subjectName`)
+    .all(teacherId);
+
+  // 🔹 For each subject, collect all scores
+  const subjectBoxPlots = subjects.map((subj) => {
+    const scores = db
+      .prepare(`
+        SELECT 
+          sc.scoreSubjectID
+          ,AVG(sc.scoreActual) AS avgScore
+          ,su.subjectName
+          ,sc.scoreStudentID
+          ,st.studentName
+        FROM scores sc
+          JOIN subjects su ON sc.scoreSubjectID = su.subjectID
+          JOIN students st ON sc.scoreStudentID = st.studentID
+        WHERE scoreTeacherID = ?
+          AND su.subjectID = ?
+
+        GROUP BY sc.scoreSubjectID ,su.subjectName ,sc.scoreStudentID,st.studentName
+      `)
+      .all(teacherId, subj.subjectID);
+    
+    const allScores = scores.filter(s => s.avgScore !== null).map(s => +(s.avgScore * 100).toFixed(2));
+    const studentNames = scores.map(s => s.studentName);
+
+    return {
+      subjectName: subj.subjectName,
+      allScores,
+      studentNames
+    };
+  });
+  res.render("teacher-stats", { teacher, subjectBoxPlots });
+});
+
 // ────────────────────────────────────────────────────────────────────────────────
 // TEACHER PASSWORD UPDATE
 // ────────────────────────────────────────────────────────────────────────────────
